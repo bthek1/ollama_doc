@@ -4,7 +4,6 @@ import sys
 import httpx
 import ollama
 from rich import box
-from rich.columns import Columns
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
@@ -15,7 +14,12 @@ from rich.text import Text
 console = Console()
 
 QUERY_MODEL = "llama3.2"
-SAMPLE_PROMPT = "In two sentences, what is Ollama and why is it useful?"
+GENERATE_PROMPTS_INSTRUCTION = (
+    "Generate exactly 10 creative, varied prompts on different topics. "
+    "Output ONLY a numbered list, one prompt per line, in this exact format:\n"
+    "1. <prompt>\n2. <prompt>\n...\n10. <prompt>\n"
+    "Do not include any introduction, explanation, or extra text."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -160,14 +164,61 @@ def render_running_table(running: list) -> Table | None:
 
 
 # ---------------------------------------------------------------------------
+# Prompt generation
+# ---------------------------------------------------------------------------
+
+def generate_prompts(model: str) -> list[str]:
+    """Ask the LLM to produce 10 prompts and return them as a list."""
+    console.print(
+        Panel(
+            f"Asking [bold cyan]{model}[/bold cyan] to generate 10 random prompts…",
+            title="[bold blue]Generating Prompts[/bold blue]",
+            expand=False,
+        )
+    )
+    console.print()
+
+    raw = Text()
+    with Live(
+        Panel(raw, title="[bold green]LLM Output[/bold green]"),
+        console=console,
+        refresh_per_second=15,
+    ) as live:
+        for chunk in ollama.chat(
+            model=model,
+            messages=[{"role": "user", "content": GENERATE_PROMPTS_INSTRUCTION}],
+            stream=True,
+        ):
+            raw.append(chunk.message.content or "")
+            live.update(Panel(raw, title="[bold green]LLM Output[/bold green]"))
+
+    prompts: list[str] = []
+    for line in raw.plain.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # strip leading "1." / "1)" / "- " etc.
+        for sep in (".", ")", "-"):
+            if line[:3].rstrip().endswith(sep) or (len(line) > 1 and line[1] == sep):
+                parts = line.split(sep, 1)
+                if len(parts) == 2:
+                    line = parts[1].strip()
+                    break
+        if line:
+            prompts.append(line)
+
+    return prompts[:10]
+
+
+# ---------------------------------------------------------------------------
 # Query
 # ---------------------------------------------------------------------------
 
-def run_query(model: str, prompt: str) -> None:
+def run_query(model: str, prompt: str, index: int, total: int) -> None:
     console.print(
         Panel(
             f"[bold yellow]{prompt}[/bold yellow]",
-            title=f"[bold cyan]Query → {model}[/bold cyan]",
+            title=f"[bold cyan]Prompt {index}/{total} → {model}[/bold cyan]",
             expand=False,
         )
     )
@@ -190,6 +241,23 @@ def run_query(model: str, prompt: str) -> None:
             live.update(
                 Panel(response_text, title="[bold green]Response[/bold green]")
             )
+
+
+def run_all_queries(model: str, prompts: list[str]) -> None:
+    total = len(prompts)
+    console.print(
+        Panel(
+            f"Running [bold cyan]{total}[/bold cyan] prompts against [bold cyan]{model}[/bold cyan]",
+            title="[bold blue]Batch Query[/bold blue]",
+            expand=False,
+        )
+    )
+    console.print()
+
+    for idx, prompt in enumerate(prompts, 1):
+        console.print(Rule(f"[dim]Prompt {idx} of {total}[/dim]"))
+        run_query(model, prompt, idx, total)
+        console.print()
 
 
 # ---------------------------------------------------------------------------
@@ -259,10 +327,6 @@ def main() -> None:
             )
         )
 
-    # --- Sample query --------------------------------------------------
-    console.print()
-    console.print(Rule("[dim]Sample Query[/dim]"))
-
     available_names = [m.model for m in models]
     model_to_use = QUERY_MODEL if QUERY_MODEL in available_names else (available_names[0] if available_names else None)
 
@@ -270,9 +334,33 @@ def main() -> None:
         console.print("[red]No models available to run a query.[/red]")
         sys.exit(1)
 
-    run_query(model_to_use, SAMPLE_PROMPT)
-
+    # --- Generate prompts via LLM --------------------------------------
     console.print()
+    console.print(Rule("[dim]Prompt Generation[/dim]"))
+    generated_prompts = generate_prompts(model_to_use)
+
+    if not generated_prompts:
+        console.print("[red]LLM did not return any parseable prompts.[/red]")
+        sys.exit(1)
+
+    prompt_table = Table(
+        title="Generated Prompts",
+        box=box.ROUNDED,
+        show_lines=True,
+        header_style="bold magenta",
+    )
+    prompt_table.add_column("#", style="dim", justify="right", width=3)
+    prompt_table.add_column("Prompt", style="yellow")
+    for i, p in enumerate(generated_prompts, 1):
+        prompt_table.add_row(str(i), p)
+    console.print()
+    console.print(prompt_table)
+
+    # --- Batch query ---------------------------------------------------
+    console.print()
+    console.print(Rule("[dim]Batch Query[/dim]"))
+    run_all_queries(model_to_use, generated_prompts)
+
     console.print(Rule("[dim]Done[/dim]"))
     console.print()
 
