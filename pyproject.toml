@@ -5,8 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "httpx>=0.28.1",
     "llm>=0.29",
     "llm-ollama>=0.15.1",
     "ollama>=0.6.1",
     "openai>=2.29.0",
+    "rich>=14.3.3",
 ]
