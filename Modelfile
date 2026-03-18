@@ -1,0 +1,6 @@
+FROM llama3.2
+
+SYSTEM "You are a helpful coding assistant. Answer concisely."
+
+PARAMETER temperature 0.7
+PARAMETER num_ctx 4096

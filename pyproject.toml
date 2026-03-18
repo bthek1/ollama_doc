@@ -1,0 +1,12 @@
+[project]
+name = "ollama-doc"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "llm>=0.29",
+    "llm-ollama>=0.15.1",
+    "ollama>=0.6.1",
+    "openai>=2.29.0",
+]
