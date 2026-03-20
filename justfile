@@ -1,32 +1,29 @@
 set dotenv-load
 
-# Default model and environment
+# Default model
 MODEL := "llama3.2"
-OLLAMA_HOST := "http://localhost:11434"
-OLLAMA_MODELS_DIR := "~/ollama_doc/models"
 
 # Show available commands
 default:
     @just --list
 
-# ── Ollama service ──────────────────────────────────────────────────────────
+# ── Compose service ──────────────────────────────────────────────────────────
 
-# Start the Ollama server in the background
+# Start the Ollama container stack
 up:
-    @echo "Starting Ollama server..."
-    @export OLLAMA_MODELS={{OLLAMA_MODELS_DIR}} && ollama serve &
-    @sleep 2
+    @echo "Starting Ollama stack..."
+    @docker compose up -d
     @just status
 
-# Stop the Ollama server
+# Stop and remove containers (models are safe — bind mount on host)
 down:
-    @echo "Stopping Ollama server..."
-    @pkill -f "ollama serve" && echo "Ollama stopped." || echo "Ollama was not running."
+    @echo "Stopping Ollama stack..."
+    @docker compose down
 
-# Restart the Ollama server
-restart: down
-    @sleep 1
-    @just up
+# Restart just the ollama service
+restart:
+    @docker compose restart ollama
+    @just status
 
 # Show server status, version, and loaded models
 status:
@@ -37,31 +34,31 @@ status:
 # Show info about the default model (or pass MODEL=<name>)
 model:
     @echo "Model: {{MODEL}}"
-    @ollama show {{MODEL}}
+    @docker exec ollama ollama show {{MODEL}}
 
 # List all locally downloaded models
 models:
-    @ollama list
+    @docker exec ollama ollama list
 
 # Pull (download) a model  — usage: just pull MODEL=mistral
 pull model=MODEL:
     @echo "Pulling model: {{model}}"
-    @OLLAMA_MODELS={{OLLAMA_MODELS_DIR}} ollama pull {{model}}
+    @docker exec ollama ollama pull {{model}}
 
 # Remove a model  — usage: just remove MODEL=llama3.2
 remove model=MODEL:
     @echo "Removing model: {{model}}"
-    @ollama rm {{model}}
+    @docker exec ollama ollama rm {{model}}
 
 # ── Inference ───────────────────────────────────────────────────────────────
 
 # Run a one-shot prompt  — usage: just run "Tell me a joke"
 run prompt="Hello!":
-    @ollama run {{MODEL}} "{{prompt}}"
+    @docker exec -it ollama ollama run {{MODEL}} "{{prompt}}"
 
 # Start an interactive chat session
 chat:
-    @ollama run {{MODEL}}
+    @docker exec -it ollama ollama run {{MODEL}}
 
 # ── Python / project ────────────────────────────────────────────────────────
 
@@ -76,20 +73,22 @@ demo:
 # Build a custom model from the local Modelfile
 build name="coding-assistant":
     @echo "Building custom model '{{name}}' from Modelfile..."
-    @OLLAMA_MODELS={{OLLAMA_MODELS_DIR}} ollama create {{name}} -f Modelfile
+    @docker cp Modelfile ollama:/tmp/Modelfile
+    @docker exec ollama ollama create {{name}} -f /tmp/Modelfile
     @echo "Done. Run: just run MODEL={{name}}"
 
 # ── Diagnostics ─────────────────────────────────────────────────────────────
 
-# Show GPU info (requires nvidia-smi)
+# Show GPU info from inside the container
 gpu:
-    @nvidia-smi --query-gpu=name,memory.total,memory.free,utilization.gpu --format=csv,noheader,nounits 2>/dev/null \
-        || echo "No NVIDIA GPU detected (or nvidia-smi not installed)."
+    @docker exec ollama nvidia-smi --query-gpu=name,memory.total,memory.free,utilization.gpu \
+        --format=csv,noheader,nounits 2>/dev/null \
+        || echo "No NVIDIA GPU detected inside container."
 
-# Tail the Ollama log (systemd)
+# Tail live logs from the ollama container
 logs:
-    @journalctl -u ollama -f --no-pager 2>/dev/null || echo "systemd service not found — server output goes to stdout when started with 'just up'."
+    @docker compose logs -f ollama
 
-# Show disk usage of the models directory
+# Show disk usage of the models directory (host-side bind mount)
 disk:
-    @du -sh {{OLLAMA_MODELS_DIR}} 2>/dev/null || echo "Models directory not found."
+    @du -sh ~/ollama_doc/models 2>/dev/null || echo "Models directory not found."
