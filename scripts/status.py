@@ -130,8 +130,7 @@ def main() -> None:
     console.print(Rule("[bold]Greeting models[/bold]"))
     for name in greet_names:
         console.print(f"[bold cyan]>> hi[/bold cyan] → [dim]{name}[/dim]")
-        with console.status(f"[dim]Waiting for {name}…[/dim]"):
-            reply = greet(name)
+        reply = greet(name)
         if reply:
             console.print(Panel(reply, title=f"[green]{name}[/green]", expand=False))
         else:

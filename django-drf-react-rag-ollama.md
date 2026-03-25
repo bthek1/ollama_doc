@@ -13,12 +13,14 @@ React (browser)
 Django + DRF  (port 8000)
     │  httpx / ollama-python  (port 8000 → 11434)
     ▼
-Ollama container  (127.0.0.1:11434)
+Ollama container  (127.0.0.1:11434  /  192.168.2.28:11434)
     │
-    └─ llama3.2 (default model)
+    └─ analysis-assistant  (qwen2.5:3b base, custom system prompt)
 ```
 
-The Ollama container exposes its REST API on **`http://localhost:11434`** — bound to loopback only (`127.0.0.1`), so only the host machine (and other Docker containers on the same network) can reach it.
+The Ollama container exposes its REST API on two addresses:
+- **`http://localhost:11434`** — loopback, local host only
+- **`http://192.168.2.28:11434`** — LAN, accessible from other machines on the local network
 
 ---
 
@@ -40,8 +42,9 @@ uv add httpx ollama openai
 
 ```python
 # ── Ollama ────────────────────────────────────────────────────────────────
-OLLAMA_BASE_URL = "http://localhost:11434"   # same host, loopback
-OLLAMA_MODEL    = "llama3.2"
+OLLAMA_BASE_URL = "http://localhost:11434"      # loopback (same host)
+# OLLAMA_BASE_URL = "http://192.168.2.28:11434" # LAN (remote clients)
+OLLAMA_MODEL    = "analysis-assistant"          # qwen2.5:3b with analysis/summary system prompt
 OLLAMA_TIMEOUT  = 120   # seconds — increase for long RAG chains
 ```
 
@@ -367,10 +370,12 @@ MIDDLEWARE = [
     ...
 ]
 
-# Development — allow the Vite dev server
+# Development — allow the Vite dev server and LAN clients
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://192.168.2.28:3000",   # LAN dev access
+    "http://192.168.2.28:8000",   # LAN Django access
 ]
 
 # Production — replace with your real domain
@@ -386,7 +391,8 @@ Store the Ollama URL in `.env` (already loaded by `just` via `set dotenv-load`):
 ```dotenv
 # .env
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
+# OLLAMA_BASE_URL=http://192.168.2.28:11434  # use this for LAN / remote clients
+OLLAMA_MODEL=analysis-assistant
 DJANGO_SECRET_KEY=change-me-in-production
 ```
 
@@ -396,7 +402,7 @@ Read them in `settings.py`:
 import os
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "analysis-assistant")
 ```
 
 ---
@@ -461,7 +467,7 @@ just pull MODEL=nomic-embed-text
 ## 10. Checklist
 
 - [ ] Ollama container is running: `just status`
-- [ ] Model is downloaded: `just models`
+- [ ] Models are present (`qwen2.5:3b` + `analysis-assistant`): `just models`
 - [ ] `OLLAMA_BASE_URL` is set correctly in `.env`
 - [ ] Django can reach `http://localhost:11434/api/version` (or `http://ollama:11434` if containerised)
 - [ ] `corsheaders` is configured for the React dev origin

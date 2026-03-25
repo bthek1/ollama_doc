@@ -1,7 +1,7 @@
 set dotenv-load
 
 # Default model
-MODEL := "llama3.2"
+MODEL := "qwen2.5:3b"
 
 # Show available commands
 default:
@@ -91,7 +91,7 @@ demo:
 
 # Build a custom model from the local Modelfile
 [group('Python / Project')]
-build name="coding-assistant":
+build name="analysis-assistant":
     @echo "Building custom model '{{name}}' from Modelfile..."
     @docker cp Modelfile ollama:/tmp/Modelfile
     @docker exec ollama ollama create {{name}} -f /tmp/Modelfile

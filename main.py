@@ -13,7 +13,7 @@ from rich.text import Text
 
 console = Console()
 
-QUERY_MODEL = "llama3.2"
+QUERY_MODEL = "qwen2.5:3b"
 GENERATE_PROMPTS_INSTRUCTION = (
     "Generate exactly 10 creative, varied prompts on different topics. "
     "Output ONLY a numbered list, one prompt per line, in this exact format:\n"
@@ -305,7 +305,7 @@ def main() -> None:
     if models:
         console.print(render_models_table(models))
     else:
-        console.print("[yellow]No local models found. Run: ollama pull llama3.2[/yellow]")
+        console.print("[yellow]No local models found. Run: ollama pull qwen2.5:3b[/yellow]")
 
     # --- Running / loaded models ---------------------------------------
     console.print()
