@@ -13,9 +13,11 @@ services:
       OLLAMA_MAX_LOADED_MODELS: "2"
       OLLAMA_FLASH_ATTENTION: "1"
       OLLAMA_KEEP_ALIVE: "10m"
-      OLLAMA_ORIGINS: "http://localhost:8000,http://192.168.2.28:8000"
+      OLLAMA_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,http://192.168.2.28:3000,http://localhost:8000,http://192.168.2.28:8000"
     devices:
       - "nvidia.com/gpu=all"     # CDI passthrough — works with cgroup v2
+    networks:
+      - ollama-network
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
@@ -33,9 +35,72 @@ services:
       OLLAMA_HOST: "http://ollama:11434"
     volumes:
       - ./Modelfile:/tmp/Modelfile:ro
+    networks:
+      - ollama-network
     entrypoint: >
       sh -c "
         ollama pull qwen2.5:3b &&
         ollama create analysis-assistant -f /tmp/Modelfile
       "
     restart: "no"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "192.168.2.28:3000:8080"         # LAN — accessible on local network
+    env_file: .env
+    environment:
+      OLLAMA_BASE_URL: "http://192.168.2.28:11434"
+      OLLAMA_SHOW_ADMIN_DETAILS: "True"
+      SCOPED_MODEL_PERMISSIONS: "True"
+      WEBUI_SECRET_KEY: "a8GxgWiRoYijEETtmTfTm5ug_eAJLN2qlFCQx91rLbM"
+      WEBUI_ADMIN_EMAIL: "${SUPERUSER_EMAIL}"
+      WEBUI_ADMIN_USERNAME: "${SUPERUSER_USERNAME}"
+      WEBUI_ADMIN_PASSWORD: "${SUPERUSER_PASSWORD}"
+    volumes:
+      - open-webui-data:/app/backend/data
+    networks:
+      - ollama-network
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  anything-llm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: anything-llm
+    restart: unless-stopped
+    ports:
+      - "192.168.2.28:3001:3001"  # LAN — accessible on local network
+    environment:
+      NODE_ENV: "production"
+      STORAGE_DIR: "/app/server/storage"  # Required for persistent storage
+      # Uncomment and set these as needed:
+      LLM_PROVIDER: "ollama"
+      OLLAMA_BASE_URL: "http://192.168.2.28:11434"
+      # OLLAMA_API_KEY: ""
+    volumes:
+      - anything-llm-data:/app/server/storage
+    networks:
+      - ollama-network
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  open-webui-data:
+    driver: local
+
+  anything-llm-data:
+    driver: local
+
+networks:
+  ollama-network:
+    driver: bridge
