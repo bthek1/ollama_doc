@@ -161,7 +161,7 @@ Token must belong to `root@pam` — other users are blocked from privileged cont
 | `just` heredocs can't contain `lxc.*` lines | GPU config lives in `scripts/lxc-202-gpu.conf`, applied via `scp` |
 | Ollama 0.30.2 doesn't support embeddings for chat models | Use `nomic-embed-text` — a dedicated embedding model that works correctly |
 | `ssh proxmox "pct ..."` fails with `command not found` / `ipcc_send_rec failed` | Non-login SSH has no `/usr/sbin` on PATH and pmxcfs needs root — use `ssh proxmox "sudo /usr/sbin/pct ..."` |
-| Container `nvidia-smi` reports `Driver/library version mismatch` | `nvidia-utils-595` in the container drifted to `595.84` while the host module is `595.71.05` — pin the container packages or update the host driver |
+| Container `nvidia-smi` reports `Driver/library version mismatch` | apt's `nvidia-utils-595` drifts to the newest 595.x (`595.84`) while the host module stays `595.71.05` — the `nvidia_userspace` role purges the apt packages and installs the exact `.run` userspace with `--no-kernel-modules` |
 
 ---
 

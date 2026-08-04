@@ -85,6 +85,7 @@ Container 202 lives on the **4 TB NVMe** (`nvme1n1`, Seagate ZP4000GP304001) in 
 - Vault: `ansible/group_vars/ollama_hosts/vault.yml` — **not currently encrypted** (placeholder only); run without `--ask-vault-pass`
 - Run with: `ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml`
 - Roles: `nvidia_userspace` → `ollama` → `open_webui` → `anything_llm`
+- `nvidia_userspace` installs userspace-only from NVIDIA's `.run` file (`--no-kernel-modules`) pinned to `nvidia_driver_version` — this **must** equal the host driver (`ssh proxmox nvidia-smi`); the role asserts it. Do not switch back to apt's `nvidia-utils-<branch>`, which floats within the branch.
 - Docker services use `--security-opt apparmor=unconfined` — required inside privileged LXC
 
 ## Known Gotchas
@@ -97,7 +98,7 @@ Container 202 lives on the **4 TB NVMe** (`nvme1n1`, Seagate ZP4000GP304001) in 
 | AnythingLLM SQLite can't write to storage | Storage dir must be `mode: 0777` |
 | `gpu-passthrough` heredoc fails in just | Config is in `scripts/lxc-202-gpu.conf`, transferred via `scp` |
 | `ssh proxmox "pct ..."` → `pct: command not found`, or `ipcc_send_rec failed` | Non-login SSH lacks `/usr/sbin` on PATH **and** pmxcfs needs root: use `ssh proxmox "sudo /usr/sbin/pct ..."` |
-| Container `nvidia-smi` → `Driver/library version mismatch` | `nvidia-utils-595` in the container tracks the latest 595.x (`595.84`) while the host kernel module is pinned at `595.71.05`; pin the container packages or update the host driver |
+| Container `nvidia-smi` → `Driver/library version mismatch` | apt's `nvidia-utils-595` floats to the newest 595.x (`595.84`) while the host module is `595.71.05`. The `nvidia_userspace` role now purges the apt packages and installs the exact-version `.run` userspace instead |
 
 ## Default Model
 

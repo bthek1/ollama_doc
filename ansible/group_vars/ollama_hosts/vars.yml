@@ -12,8 +12,13 @@ ollama_keep_alive: 10m
 ollama_host: "0.0.0.0:11434"
 
 # NVIDIA — RTX 3060
-# Must match the host kernel module version (595.71.05)
-nvidia_driver_version: "595"
+# Must match the Proxmox host kernel module EXACTLY — check with `ssh proxmox nvidia-smi`.
+# Installed userspace-only from NVIDIA's .run file; apt's nvidia-utils-595 floats
+# to the newest 595.x point release and breaks NVML with a version mismatch.
+nvidia_driver_version: "595.71.05"
+nvidia_driver_branch: "595" # major branch, for purging stale apt packages
+nvidia_runfile_name: "NVIDIA-Linux-x86_64-{{ nvidia_driver_version }}.run"
+nvidia_runfile_url: "https://us.download.nvidia.com/XFree86/Linux-x86_64/{{ nvidia_driver_version }}/{{ nvidia_runfile_name }}"
 
 # Open WebUI
 open_webui_port: 3000

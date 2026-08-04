@@ -1,2 +1,11 @@
 ---
-# No reboot handler — kernel module lives on the Proxmox host, not the container
+# No reboot handler — kernel module lives on the Proxmox host, not the container.
+# Ollama resolves the CUDA driver at startup, so it must be restarted after the
+# userspace libraries change. Defined here rather than reusing the ollama role's
+# handler because nvidia_userspace runs first, and on a fresh container the
+# ollama unit does not exist yet.
+- name: Restart ollama after driver change
+  ansible.builtin.systemd:
+    name: ollama
+    state: restarted
+  failed_when: false

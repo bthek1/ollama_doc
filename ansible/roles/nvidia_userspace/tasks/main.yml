@@ -1,38 +1,72 @@
 ---
+# The container shares the host's NVIDIA kernel module via /dev/nvidia* device
+# passthrough, so the userspace libraries must match the host driver EXACTLY.
+# The host driver is installed from NVIDIA's .run installer, and Ubuntu's
+# nvidia-utils-<branch> packages float to the newest point release in that
+# branch (595.84 vs the host's 595.71.05), which breaks NVML with
+# "Driver/library version mismatch". So install userspace-only from the same
+# pinned .run file the host uses.
+
 - name: Install prerequisites
   ansible.builtin.apt:
     name:
       - curl
-      - gnupg
-      - software-properties-common
+      - kmod
     state: present
     update_cache: true
 
-- name: Add NVIDIA apt key
-  ansible.builtin.apt_key:
-    url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/3bf863cc.pub
-    state: present
-
-- name: Add NVIDIA CUDA apt repository
-  ansible.builtin.apt_repository:
-    repo: "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64 /"
-    state: present
-    filename: nvidia-cuda
-
-- name: Install NVIDIA userspace libraries (must match host driver {{ nvidia_driver_version }})
+- name: Remove apt-managed NVIDIA packages (they drift from the host driver)
   ansible.builtin.apt:
     name:
-      - "nvidia-utils-{{ nvidia_driver_version }}"
-      - "libnvidia-compute-{{ nvidia_driver_version }}"
-    state: present
-    update_cache: true
+      - "nvidia-utils-{{ nvidia_driver_branch }}"
+      - "libnvidia-compute-{{ nvidia_driver_branch }}"
+      - "nvidia-kernel-common-{{ nvidia_driver_branch }}"
+    state: absent
+    purge: true
+
+- name: Check installed userspace driver version
+  ansible.builtin.command: nvidia-smi --version
+  register: nvidia_installed_version
+  changed_when: false
+  failed_when: false
+
+- name: Download NVIDIA {{ nvidia_driver_version }} runfile
+  ansible.builtin.get_url:
+    url: "{{ nvidia_runfile_url }}"
+    dest: "/tmp/{{ nvidia_runfile_name }}"
+    mode: "0755"
+  when: nvidia_driver_version not in nvidia_installed_version.stdout
+
+# --no-kernel-modules: the host provides the kernel module; the container must
+# never build or load one. --no-drm/--no-nvidia-modprobe: not applicable in LXC.
+- name: Install NVIDIA userspace libraries {{ nvidia_driver_version }} (no kernel module)
+  ansible.builtin.command:
+    cmd: >-
+      /tmp/{{ nvidia_runfile_name }}
+      --silent
+      --no-kernel-modules
+      --no-kernel-module-source
+      --no-nvidia-modprobe
+      --no-drm
+      --install-compat32-libs
+  when: nvidia_driver_version not in nvidia_installed_version.stdout
+  notify: Restart ollama after driver change
+
+- name: Remove runfile
+  ansible.builtin.file:
+    path: "/tmp/{{ nvidia_runfile_name }}"
+    state: absent
 
 - name: Verify nvidia-smi sees the GPU
-  ansible.builtin.command: nvidia-smi --query-gpu=name --format=csv,noheader
+  ansible.builtin.command: nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
   register: nvidia_smi_out
   changed_when: false
-  failed_when: nvidia_smi_out.rc != 0
 
-- name: Show detected GPU
-  ansible.builtin.debug:
-    msg: "GPU detected: {{ nvidia_smi_out.stdout }}"
+- name: Assert container userspace matches the host driver
+  ansible.builtin.assert:
+    that: nvidia_driver_version in nvidia_smi_out.stdout
+    fail_msg: >-
+      Container userspace is {{ nvidia_smi_out.stdout }} but the host driver is
+      {{ nvidia_driver_version }}. Update nvidia_driver_version to match the
+      host (`ssh proxmox nvidia-smi`) and re-run.
+    success_msg: "GPU detected: {{ nvidia_smi_out.stdout }}"
