@@ -29,11 +29,11 @@ provision:
     ssh proxmox "echo 3719 | sudo -Sp '' bash -c 'echo \"{{SSH_PUBKEY}}\" > /tmp/ollama-202.pub'"
     ssh proxmox "echo 3719 | sudo -Sp '' pct create 202 local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst \
       --hostname ollama-202 \
-      --memory 4096 \
+      --memory 8192 \
       --swap 2048 \
       --cores 4 \
       --net0 name=eth0,bridge=vmbr0,ip=192.168.2.202/24,gw=192.168.2.1 \
-      --rootfs local-lvm:80 \
+      --rootfs nvme4tb-lvm:80 \
       --unprivileged 0 \
       --features nesting=1 \
       --ssh-public-keys /tmp/ollama-202.pub \

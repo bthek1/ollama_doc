@@ -2,7 +2,7 @@
 
 Terraform + Ansible infrastructure for running Ollama on a Proxmox LXC container with NVIDIA GPU passthrough.
 
-**Target:** LXC 202 — `192.168.2.202` — NVIDIA GeForce RTX 3060 (12 GB VRAM)
+**Target:** LXC 202 — `192.168.2.202` — NVIDIA GeForce RTX 3060 (12 GB VRAM) — 4 cores / 8 GB RAM / 80 GB on the `nvme4tb-lvm` pool (4 TB NVMe)
 
 ---
 
@@ -85,7 +85,8 @@ proxmox_ollama/
 │   ├── test_ollama.py        # Ollama API test client (health, models, generate, chat, embeddings)
 │   └── lxc-202-gpu.conf      # LXC conf lines appended by just gpu-passthrough
 ├── docs/
-│   ├── docker-ollama-reference.md
+│   ├── ollama-api-reference.md
+│   ├── llm-pipelines.md
 │   ├── proxmox-lxc-terraform-guide.md
 │   └── plans/Completed/
 │       ├── lxc-gpu-passthrough.md       # completed plan + lessons learned
@@ -159,6 +160,8 @@ Token must belong to `root@pam` — other users are blocked from privileged cont
 | AnythingLLM SQLite can't write to mounted volume | Storage dir created with `mode: 0777` |
 | `just` heredocs can't contain `lxc.*` lines | GPU config lives in `scripts/lxc-202-gpu.conf`, applied via `scp` |
 | Ollama 0.30.2 doesn't support embeddings for chat models | Use `nomic-embed-text` — a dedicated embedding model that works correctly |
+| `ssh proxmox "pct ..."` fails with `command not found` / `ipcc_send_rec failed` | Non-login SSH has no `/usr/sbin` on PATH and pmxcfs needs root — use `ssh proxmox "sudo /usr/sbin/pct ..."` |
+| Container `nvidia-smi` reports `Driver/library version mismatch` | `nvidia-utils-595` in the container drifted to `595.84` while the host module is `595.71.05` — pin the container packages or update the host driver |
 
 ---
 
@@ -169,4 +172,3 @@ Token must belong to `root@pam` — other users are blocked from privileged cont
 - [LXC GPU Passthrough Plan](docs/plans/Completed/lxc-gpu-passthrough.md) — completed, full lessons learned
 - [uv + Ollama API Client Plan](docs/plans/Completed/uv-ollama-test-client.md) — completed, embedding gotcha explained
 - [Proxmox LXC Terraform Guide](docs/proxmox-lxc-terraform-guide.md)
-- [Docker Ollama Reference](docs/docker-ollama-reference.md) — archived Docker knowledge

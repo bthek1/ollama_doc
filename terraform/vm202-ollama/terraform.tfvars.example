@@ -11,10 +11,10 @@ vm_name      = "ollama-202"
 template_file_id = "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 
 cores     = 4
-memory_mb = 4096   # 4 GB
+memory_mb = 8192   # 8 GB
 
 disk_size  = 80
-datastore  = "local-lvm"
+datastore  = "nvme4tb-lvm" # 4 TB NVMe thin pool — model files are large
 
 ip_address  = "192.168.2.202/24"
 gateway     = "192.168.2.1"

@@ -48,7 +48,7 @@ variable "cores" {
 variable "memory_mb" {
   description = "RAM in MB"
   type        = number
-  default     = 4096 # 4 GB
+  default     = 8192 # 8 GB
 }
 
 variable "disk_size" {
@@ -60,7 +60,7 @@ variable "disk_size" {
 variable "datastore" {
   description = "Proxmox storage pool for the disk"
   type        = string
-  default     = "local-lvm"
+  default     = "nvme4tb-lvm"
 }
 
 variable "ip_address" {
